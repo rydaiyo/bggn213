@@ -1,0 +1,137 @@
+---
+title: "feb04_2022 class"
+author: "Rachel Diao"
+date: "2/4/2022"
+output:
+  pdf_document: default
+  html_document: default
+---
+# This is an R Markdown header 
+## Level 2 heading 
+### Level 3 heading
+This is just plain text.
+
+
+### We are now learning how to write functions. 
+
+First we will write a funciton to grade some student scores. 
+```{r Learning how to write functions}
+student1 <- c(100, 100, 100, 100, 100, 100, 100, 90)
+student2 <- c(100, NA, 90, 90, 90, 90, 97, 80)
+student3 <- c(90, NA, NA, NA, NA, NA, NA, NA)
+
+mean(student1)
+
+#For student 2, you'd have to drop the NA or else there'd be an error
+mean(student2, na.rm = TRUE)
+
+#For student 3... you're dropping NAs so you're not accounting for how little this person did
+mean(student3, na.rm = TRUE)
+
+#Convert all NAs in a vector to 0 
+student3_placehold <- student3
+student3_placehold[is.na(student3)] <- 0
+student3_placehold
+mean(student3_placehold)
+```
+Now we know how to get rid of NAs, we can write a function to calculate any student's average grade. This function takes in grade_list, a character vector containing numerical scores (or NA if any assignments were omitted). 
+
+Use if/else to approach this; if a student's grade list contains NA, then convert all the NAs to 0 before calculating the average and returning that as the output of the function. If there are no NAs, then proceed to normally calculate the mean. 
+```{r Calculate average function}
+calc_average <- function(grade_list){
+  if (any(is.na(grade_list)) == TRUE) {
+    grade_list[is.na(grade_list)] <- 0
+    return(mean(grade_list))
+  }
+  else{
+    return(mean(grade_list))
+  }
+}
+```
+
+Test out our function on each student
+```{r Test on students}
+s1_avg <- calc_average(student1)
+s2_avg <- calc_average(student2)
+s3_avg <- calc_average(student3)
+```
+
+Now we can try altering this function to also calculate each student's grade after they drop their lowest score. 
+
+Function: grade 
+Takes in a character vector containing numerical grades (and NAs for any omitted assignments
+```{r}
+#Hint: which.min() finds out which position of a list contains a minimum (same with which.max())
+which.min(student1)
+student1[which.min(student1)] #prints out the lowest score after finding its position
+
+which.min(student3_placehold)
+#In the case of student 3, there are multiple grades with the minimum value (0), but this function will still only pick one to proceed with. 
+
+#Test out notation for dropping an element form a vector
+student3_placehold_drop <- student3_placehold[-which.min(student3_placehold)]
+
+grade <- function(gradelist){
+  #First: if any NAs are present in the list, convert to 0
+  if (any(is.na(gradelist)) == TRUE) {
+    gradelist[is.na(gradelist)] <- 0
+  }
+  
+  #Then we can find the minimum and drop it using vec_name[-element] notation
+  dropped <- gradelist[-which.min(gradelist)]
+  
+  #Then return the average
+  return(mean(dropped))
+}
+```
+
+Test the 'grade' function on the students' grades. 
+```{r}
+grade(student1)
+grade(student2)
+grade(student3)
+```
+
+### Question 1
+Now apply this to dataframe 'student_homework.csv'. Import into R using read.csv. Each column is for a different homework assignment and each row is for a different student. 
+
+We want to use the function 'apply' to apply the 'grade' function to each row of this dataframe. 
+```{r}
+#Add argument row.names = 1 so that the first column (student names) is an index and no longer content of the dataframe.
+sh <- read.csv('student_homework.csv', row.names = 1)
+
+#Apply function to the dataframe that has no student names 
+#Margin = shows how to apply the function --> i.e. 1 is rows, 2 is columns
+apply(sh, MARGIN = 1, FUN = grade)
+```
+
+### Question 2 
+The top-scoring student in the gradebook is student 18, with an average of 94.50.
+
+```{r}
+averages <- apply(sh, MARGIN = 1, FUN = grade)
+which.max(averages)
+```
+
+
+
+### Question 3
+The homework that was toughest on the students was hw2, with a class average of 72.80.
+```{r}
+#Duplicate the dataframe and then convert all NAs to 0
+dup_sh <- sh
+dup_sh[is.na(dup_sh)] <- 0
+
+#Find the average score for each column
+colMeans(dup_sh)
+
+#Alternative method: 
+apply(sh, 2, mean, na.rm=TRUE)
+
+#BUT THE ANSWERS ARE DIFFERENT depending on whether you remove NAs or convert them to 0
+#Visualize the data to figure out what's going on here
+boxplot(sh)
+```
+
+
+
