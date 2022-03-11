@@ -1,0 +1,264 @@
+---
+output:
+  pdf_document: default
+  html_document: default
+---
+r---
+title: "Pertussis Mini Project"
+author: "Rachel Diao"
+date: "3/9/2022"
+output: html_document
+---
+Use datapasta to copy and paste data from CDC website link, converts it to a dataframe 
+```{r}
+library(datapasta)
+library(ggplot2)
+library(jsonlite)
+library(lubridate)
+library(dplyr)
+```
+
+```{r}
+cdc <- data.frame(
+                                 Year = c(1922L,1923L,1924L,1925L,
+                                          1926L,1927L,1928L,1929L,1930L,1931L,
+                                          1932L,1933L,1934L,1935L,1936L,
+                                          1937L,1938L,1939L,1940L,1941L,1942L,
+                                          1943L,1944L,1945L,1946L,1947L,
+                                          1948L,1949L,1950L,1951L,1952L,
+                                          1953L,1954L,1955L,1956L,1957L,1958L,
+                                          1959L,1960L,1961L,1962L,1963L,
+                                          1964L,1965L,1966L,1967L,1968L,1969L,
+                                          1970L,1971L,1972L,1973L,1974L,
+                                          1975L,1976L,1977L,1978L,1979L,1980L,
+                                          1981L,1982L,1983L,1984L,1985L,
+                                          1986L,1987L,1988L,1989L,1990L,
+                                          1991L,1992L,1993L,1994L,1995L,1996L,
+                                          1997L,1998L,1999L,2000L,2001L,
+                                          2002L,2003L,2004L,2005L,2006L,2007L,
+                                          2008L,2009L,2010L,2011L,2012L,
+                                          2013L,2014L,2015L,2016L,2017L,2018L,
+                                          2019L),
+         No..Reported.Pertussis.Cases = c(107473,164191,165418,152003,
+                                          202210,181411,161799,197371,
+                                          166914,172559,215343,179135,265269,
+                                          180518,147237,214652,227319,103188,
+                                          183866,222202,191383,191890,109873,
+                                          133792,109860,156517,74715,69479,
+                                          120718,68687,45030,37129,60886,
+                                          62786,31732,28295,32148,40005,
+                                          14809,11468,17749,17135,13005,6799,
+                                          7717,9718,4810,3285,4249,3036,
+                                          3287,1759,2402,1738,1010,2177,2063,
+                                          1623,1730,1248,1895,2463,2276,
+                                          3589,4195,2823,3450,4157,4570,
+                                          2719,4083,6586,4617,5137,7796,6564,
+                                          7405,7298,7867,7580,9771,11647,
+                                          25827,25616,15632,10454,13278,
+                                          16858,27550,18719,48277,28639,32971,
+                                          20762,17972,18975,15609,18617)
+       )
+```
+
+## Question 1 
+Plot this dataframe of case numbers over time in ggplot.
+```{r}
+pertus <- ggplot(cdc, aes(x=Year, y=No..Reported.Pertussis.Cases)) + 
+  geom_point() + geom_line() + 
+  xlab('Number of Reported Pertussis Cases') + 
+  ylab('Year') + 
+  ggtitle('Number of Reported Pertussis Cases from 1922 - 2019')
+
+pertus
+```
+## Question 2
+Add lines: at 1946 to indicate the introduction of the wP (whole-cell Pertussis) vaccine and the aP (acellular Pertussis) vaccine in 1996. 
+```{r}
+pertus + geom_vline(xintercept=1946, linetype='dashed', col='blue') + 
+  geom_vline(xintercept=1996, linetype='dashed', col='red')
+```
+## Question 3 
+After the introduction of the aP version of hte vaccine, very few cases of pertussis remain, but there is slight rise in Pertussis cases starting in the early 2000s. This may be due to the rise of the anti-vaxxer movement in the late 1990s/early 2000s. There also could have been the takeover of a new dominant Pertussis strain, or increases in travel to places with greater Pertussis presence (i.e. countries where vaccination isn't as prominent).
+
+Apparently many teenagers got pertussis in the early 2000s; this may have been because the aP vaccine does not work as well as the old one did, so the immunity has worn off over time (~10 years) in the first cohorts that got vaccinated... but this is very hard to test because it's such a long-term study. 
+
+# Exploring CMI-PB data 
+
+CMI-PB project - will provide information on immune responses over time to wP vs. aP vaccinated individuals.
+
+Need to use jsonlite package to import json type data formats (looks similar to a Python dictionary)
+```{r}
+subject <- read_json("https://www.cmi-pb.org/api/subject", simplifyVector = TRUE) 
+
+head(subject, 3)
+```
+
+## Question 4
+49 wP subjects, 47 aP subjects
+
+## Question 5 
+30 male subjects, 66 female subjects 
+
+## Question 6
+American Indian/Alaska Native: 0 females, 1 male 
+Asian: 18 females, 1 male
+Black or African American: 2 females, 0 males
+More Than One Race: 8 females, 2 males
+Native Hawaiian or Other Pacific Islander: 1 female, 1 male
+Unknown or Not Repoted: 10 females, 4 males
+White: 27 females, 13 males
+
+```{r}
+table(subject$infancy_vac)
+
+table(subject$biological_sex)
+
+table(subject$race, subject$biological_sex)
+```
+
+## Question 7 
+We want to know the average age of wP individuals and aP individuals.
+Average age of wP individuals: 35 years old 
+Average age of aP individuals: 24 years old
+
+To start, we must first convert all date formats into lubridate objects. The columns are year_of_birth and date_of_boost, all in yyyyy-mm-dd format.
+```{r}
+subject$year_of_birth <- ymd(subject$year_of_birth)
+subject$date_of_boost <- ymd(subject$date_of_boost)
+```
+
+Then we can take averages of aP and wP individuals specifically. 
+```{r}
+mean(today() - subject$year_of_birth[which(subject$infancy_vac=='aP')])/365.25
+mean(today() - subject$year_of_birth[which(subject$infancy_vac=='wP')])/365.25
+```
+
+## Question 8 
+The average age of all individuals at the time of boost: 25 years old
+```{r}
+mean(subject$date_of_boost - subject$year_of_birth)/365.25
+```
+
+## We are skipping through the rest of the date stuff 
+
+# Joining tables
+
+Retrieve specimen and antibody titer JSON data the same way as before.
+```{r}
+specimen <- read_json("https://www.cmi-pb.org/api/specimen", simplifyVector = TRUE) 
+titer <- read_json("https://www.cmi-pb.org/api/ab_titer", simplifyVector = TRUE) 
+```
+
+## Question 9 
+Join specimen and subject tables with dplyr join function! Use inner_join() specifically because we only want complete data.
+
+We have multiple specimens per subject (despite only 96 subjects, 729 specimens)
+```{r}
+meta <- inner_join(specimen, subject)
+dim(meta)
+head(meta)
+```
+## Question 10 
+Now join titer to this subject/specimen dataframe. 
+```{r}
+abdata <- inner_join(titer, meta)
+dim(abdata)
+```
+
+## Question 11
+```{r}
+table(abdata$isotype)
+```
+
+## Question 12 
+There were only 80 visit 8s, relative to the ~4000+ on the previous visits.
+```{r}
+table(abdata$visit)
+```
+
+# Examine IgG1 
+Want to exclude the 8th visit.
+```{r}
+ig1 <- abdata %>% filter(isotype == "IgG1", visit!=8)
+head(ig1)
+```
+## Question 13
+Graph the antibody titer levels for all antigens
+```{r}
+ggplot(ig1) +
+  aes(ab_titer, antigen) +
+  geom_boxplot() + 
+  facet_wrap(vars(visit), nrow=2)
+```
+
+Now we add in the infancy_vac information (whether they received the wP or aP vaccine) as the color to look at differences in antibody titer between the two. 
+```{r}
+ggplot(ig1) +
+  aes(ab_titer, antigen, col=infancy_vac) +
+  geom_boxplot(show.legend = TRUE) + 
+  facet_wrap(vars(visit), nrow=2) +
+  theme_bw() 
+```
+Facet by both vaccine type and by visit number
+```{r}
+ggplot(ig1) +
+  aes(ab_titer, antigen, col=infancy_vac ) +
+  geom_boxplot(show.legend = TRUE) + 
+  facet_wrap(vars(infancy_vac, visit), nrow=2)
+```
+
+Separate by visits 1 and 4 only just for ease of visualization!
+```{r}
+ig1_1n4 <- abdata %>% filter(isotype == "IgG1", visit==c(1,4))
+```
+
+```{r}
+ggplot(ig1_1n4) +
+  aes(ab_titer, antigen, col=infancy_vac ) +
+  geom_boxplot(show.legend = FALSE) + 
+  facet_wrap(vars(infancy_vac, visit), nrow=2)
+```
+Plot measles antibody count.
+```{r}
+filter(ig1, antigen=="Measles") %>%
+  ggplot() +
+  aes(ab_titer, col=infancy_vac) +
+  geom_boxplot(show.legend=TRUE) +
+  facet_wrap(vars(visit)) +
+  theme_bw()
+```
+
+Plot FIM2/3 - a Pertussis antigen
+```{r}
+filter(ig1, antigen=='FIM2/3') %>%
+  ggplot() +
+  aes(ab_titer, col=infancy_vac) +
+  geom_boxplot(show.legend = TRUE) +
+  facet_wrap(vars(visit)) +
+  theme_bw()
+```
+# Working with expression data 
+
+We now want to look at the expression of IGHG1, which expresses IgG antibodies.
+```{r}
+url <- "https://www.cmi-pb.org/api/v2/rnaseq?versioned_ensembl_gene_id=eq.ENSG00000211896.7"
+rna <- read_json(url, simplifyVector = TRUE)
+
+#meta <- inner_join(specimen, subject)
+ssrna <- inner_join(rna, meta)
+```
+
+## Question 18
+Plot timecourse of expression of IGHG1 gene! Add group to aesthetics parameter (gropu by subject_id) so that we can see the trend of IGHG1 expression per subject! 
+```{r}
+ggplot(ssrna) +
+  aes(visit, tpm, col=infancy_vac, group=subject_id) +
+  geom_point() +
+  geom_line(alpha=0.2)
+```
+
+## Question 19
+The expression of IGHG1 starts out low but then generally drastically increases at visit 4 before lowering again back to week 3 levels by week 5.
+
+## Question 20 
+This data matches with the antibody titer data in that there is a dramatic increase at visit 4. However, the antibody titers remain high past visit 4 while the transcript levels fall basically back to baseline after visit 4. This inconsistency is due to the persistence of antibody protein in blood, while the transcripts themselves are not present in the blood (where these samples are from).
