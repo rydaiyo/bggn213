@@ -1,0 +1,267 @@
+---
+title: "mini project"
+author: "Rachel Diao"
+date: "2/14/2022"
+output:
+  pdf_document: default
+  html_document: default
+---
+
+```{r}
+#Import file first 
+fna.data <- 'WisconsinCancer.csv'
+wisc.df <- read.csv(fna.data, row.names=1)
+
+#head(wisc.df)
+```
+Omit the first column (diagnosis) because it's unnecessary for analysis for now. However, we will store the vector for use as a factor later.
+```{r}
+# We can use -1 here to remove the first column
+wisc.data <- wisc.df[,-1]
+
+#Store as a vector 
+diagnosis <- wisc.df$diagnosis
+```
+
+## Question 1 
+There are 569 observations in this dataset. 
+
+```{r}
+#Number of observations = number of rows in the dataframe
+nrow(wisc.df)
+```
+
+## Question 2
+There are 212 malignant diagnoses.
+
+```{r}
+#Find out how many patients had a malignant diagnosis using grep for 'M' within character vector diagnosis
+#grep() returns the positions in the character vector; find the length of this list to get number
+length(grep('M', diagnosis))
+```
+
+## Question 3 
+10 variables in the data are suffixed with '_mean'.
+
+```{r}
+length(grep('_mean', colnames(wisc.df)))
+```
+# PCA 
+```{r}
+# Check column means and standard deviations
+colMeans(wisc.data)
+
+apply(wisc.data,2,sd)
+```
+```{r}
+#Run PCA on data! 
+wisc.pr <- prcomp(wisc.data, scale=TRUE)
+
+summary(wisc.pr)
+```
+
+## Question 4 
+44.27% of the original variance is captured by first principal component (PC1). 
+
+## Question 5
+3 PCs are required to describe at least 70% of the variance in the data.
+
+## Question 6
+7 PCs are required to describe at least 90% of the variance in the data.
+
+## Question 7 
+This biplot is much too cluttered because here are too many variables to account for per observation and the dataset is also much too large for this visualization to be effective.
+```{r}
+biplot(wisc.pr)
+```
+
+```{r}
+# Scatter plot observations by components 1 and 2
+#Want each point colored based on diagnosis vector using ifelse()
+#ifelse(conditional, if yes, if not)
+plot(wisc.pr$x[,1], wisc.pr$x[,2], col = ifelse(diagnosis == 'M','red','black'), 
+     xlab = "PC1", ylab = "PC2")
+```
+## Question 8 
+The plot of PCs 1 and 2 seems to generate 2 slightly more separate clusters than the plot of PCs 1 and 3. This may be because PC2 explains a greater proportion of variance than PC3.
+```{r}
+# Repeat for components 1 and 3
+plot(wisc.pr$x[,1], wisc.pr$x[,3], col = ifelse(diagnosis == 'M','red','black'), 
+     xlab = "PC1", ylab = "PC3")
+```
+
+Now plot in ggplot2!
+```{r}
+# Create a data.frame for ggplot
+df <- as.data.frame(wisc.pr$x)
+df$diagnosis <- diagnosis
+
+# Load the ggplot2 package
+library(ggplot2)
+
+# Make a scatter plot colored by diagnosis
+ggplot(df) + 
+  aes(PC1, PC2, col=diagnosis) + 
+  geom_point()
+```
+
+```{r}
+# Calculate variance of each component
+pr.var <- wisc.pr$sdev^2
+head(pr.var)
+```
+
+```{r}
+# Variance explained by each principal component: pve
+pve <-  wisc.pr$sdev^2/sum(wisc.pr$sdev^2) 
+
+# Plot variance explained for each principal component
+plot(pve, xlab = "Principal Component", 
+     ylab = "Proportion of Variance Explained", 
+     ylim = c(0, 1), type = "o")
+```
+
+```{r}
+# Alternative scree plot of the same data, note data driven y-axis
+barplot(pve, ylab = "Precent of Variance Explained",
+     names.arg=paste0("PC",1:length(pve)), las=2, axes = FALSE)
+axis(2, at=pve, labels=round(pve,2)*100 )
+```
+
+## Question 9 
+Loading scores show the influence of each variable on each principle component. The loading for concave.points_mean for the first principal component is -0.26085376.
+```{r}
+wisc.pr$rotation[,1]
+```
+
+## Question 10 
+A minimum of 5 PCs are required to explain 80% of the variance in the data.
+
+
+# Hierarchical Clustering 
+```{r}
+# Scale the wisc.data data using the "scale()" function
+data.scaled <- scale(wisc.data)
+
+#Calculate Euclidean distances
+data.dist <- dist(data.scaled)
+
+#Perform clustering using complete linkage
+wisc.hclust <- hclust(data.dist, method='complete')
+```
+
+
+## Question 11 
+The height at which the clustering model has 4 clusters is h=19.
+
+```{r}
+plot(wisc.hclust)
+abline(wisc.hclust, h=19, col="red", lty=2)
+```
+Cut the tree so there are only 4 clusters (change argument k)
+```{r}
+wisc.hclust.clusters <- cutree(wisc.hclust, k=4)
+
+#Compare cluster membership to diagnoses
+table(wisc.hclust.clusters, diagnosis)
+```
+
+## Question 12 
+The cluster vs. diagnoses match is only slightly better when the tree is cut into higher numbers of clusters, with certain clusters being able to completely match to a benign diagnosis (there isn't much of a change in the matching to malignant diagnoses).
+
+```{r}
+wisc.hclust.clusters3 <- cutree(wisc.hclust, k=2)
+table(wisc.hclust.clusters3, diagnosis)
+```
+
+## Question 13 
+Ward's method gives my favorite results for this dataset because for the number of clusters that I chose (k=4), it provided greater separation between clusters than any of the other methods. Each cluster more clearly mapped to a particular diagnosis more clearly than with the other methods. 
+
+```{r}
+#Perform clustering using single linkage
+wisc.hclust_single <- hclust(data.dist, method='single')
+plot(wisc.hclust_single)
+wisc.hclust.clusters_s <- cutree(wisc.hclust_single, k=4)
+table(wisc.hclust.clusters_s, diagnosis)
+
+#Perform clustering using average linkage
+wisc.hclust_av <- hclust(data.dist, method='average')
+plot(wisc.hclust_av)
+wisc.hclust.clusters_av <- cutree(wisc.hclust_av, k=4)
+table(wisc.hclust.clusters_av, diagnosis)
+
+#Perform clustering using Ward's method
+wisc.hclust_ward <- hclust(data.dist, method='ward.D2')
+plot(wisc.hclust_ward)
+wisc.hclust.clusters_w <- cutree(wisc.hclust_ward, k=4)
+table(wisc.hclust.clusters_w, diagnosis)
+```
+
+# K-Means Clustering 
+
+## Question 14
+K-means clustering separates out diagnosis clusters more robustly than does the hierarchical clustering methods we used above for the same # of clusters k (k=2). In the k-means clustering, cluster 2 is very clearly the malignant diagnosis cluster and cluster 1 much more clearly skews towards diagnoses. 
+
+```{r}
+wisc.km <- kmeans(wisc.data, centers= 2, nstart= 20)
+table(wisc.km$cluster, diagnosis)
+
+#Compare to hierarchical clustering 
+table(wisc.hclust.clusters3, diagnosis)
+
+```
+
+
+# Combining Methods
+```{r}
+wisc.pr.hclust <- hclust(data.dist, method='ward.D2')
+grps <- cutree(wisc.pr.hclust, k=2)
+table(grps)
+plot(wisc.pr.hclust)
+
+
+table(grps, diagnosis)
+```
+
+```{r}
+plot(wisc.pr$x[,1:2], col=grps)
+```
+
+```{r}
+#Now the colors are based on diagnosis rather than the cluster they belong to
+plot(wisc.pr$x[,1:2], col=ifelse(diagnosis == 'M','red','black'))
+```
+
+```{r}
+g <- as.factor(grps)
+levels(g)
+
+g <- relevel(g,2)
+levels(g)
+
+# Plot using our re-ordered factor 
+plot(wisc.pr$x[,1:2], col=g)
+```
+
+## Question 15 
+with 4 clusters, the model using just the first 7 PCs l. 
+```{r}
+#Use the distance along the first 7 PCs for clustering 
+dist_first7 <- dist(wisc.pr$x[,1:7])
+wisc.pr.hclust <- hclust(dist_first7, method="ward.D2")
+
+#Separate into 2 clusters
+wisc.pr.hclust.clusters <- cutree(wisc.pr.hclust, k=2)
+table(wisc.pr.hclust.clusters, diagnosis)
+
+#When separated into 4 clusters: 
+wisc.pr.hclust.clusters4 <- cutree(wisc.pr.hclust, k=4)
+table(wisc.pr.hclust.clusters4, diagnosis)
+
+#Original 
+table(wisc.hclust.clusters, diagnosis)
+
+```
+
+
+
