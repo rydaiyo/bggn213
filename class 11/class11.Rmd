@@ -1,0 +1,304 @@
+---
+title: "Class 11"
+author: "Rachel Diao"
+date: "2/23/2022"
+output:
+  pdf_document: default
+  html_document: default
+---
+
+Import files
+```{r}
+count <- read.csv("airway_scaledcounts.csv", row.names=1)
+md <-  read.csv("airway_metadata.csv")
+
+#Number of rows in count dataframe = number of genes 
+nrow(count)
+```
+
+## Question 1 
+There are 38694 genes in this dataset 
+Alternatively: there are`r `nrow(count)` in this dataset
+
+## Question 2
+There are 4 control cell lines in this dataset 
+
+We want to compare treated vs. control to see if the drug works. 
+```{r}
+#Are the sample IDs from the metadata (md) file the same as the column names (samples) in the counts (count) data frame? 
+md$id == colnames(count)
+```
+
+Find the average gene expression per group. First I want to extract the columns of the dataframe 'count' that are just for the control group into a separate 'controls' dataframe.' I know which samples are control samples from the metadata table 'md.' Then I will find the mean gene expression across the rows of this dataframe.  
+```{r}
+controls <- count[md$id[which(md$dex == 'control')]]
+control.mean <- rowSums(controls)/4 
+head(control.mean)
+```
+
+## Question 4 
+Apply the same to the treated samples. 
+```{r}
+treated <- count[md$id[which(md$dex == 'treated')]]
+treated.mean <- rowSums(treated)/4 
+head(treated.mean)
+```
+
+Compile control and treated mean counts into one dataframe 'meancounts.'
+```{r}
+meancounts <- data.frame(control.mean, treated.mean)
+colSums(meancounts)
+```
+
+## Question 5
+Plot the average counts for control vs. treated against each other in a scatterplot.
+```{r}
+plot(meancounts, xlab = 'Control', ylab = 'Treated')
+```
+
+Now use ggplot2. 
+```{r}
+library(ggplot2)
+ggplot(meancounts, aes(control.mean, treated.mean)) + geom_point(alpha = 0.5) + 
+  xlab('Control') + ylab('Treated')
+```
+
+## Question 6 
+Now graph this on a log scale. 
+```{r}
+plot(meancounts, log='xy', xlab = 'Control', ylab = 'Treated')
+```
+
+In ggplot2:
+```{r}
+ggplot(meancounts, aes(control.mean, treated.mean)) + geom_point(alpha = 0.5) + 
+  scale_x_continuous(trans="log2") + scale_y_continuous(trans="log2") + 
+  xlab('Control') + ylab('Treated')
+```
+
+Now calculate log2 fold change and add this as a column in 'meancounts'. 
+We use log2 fold change over just plain fold change because it generates values symmetric about 0. 
+```{r}
+meancounts$log2fc <- log2(meancounts[,"treated.mean"]/meancounts[,"control.mean"])
+head(meancounts)
+```
+
+Get non-numerical values from log(0) like NaN and infinity, get rid of these values and drop the rows containing these values. is.finite() function gets rid of both NaNs and infinity values
+```{r}
+mycounts <- meancounts[is.finite(meancounts$log2fc),]
+```
+
+## Question 7 
+The arr.id argument of which() allows the function to return the dimensions within the dataframe where  whatever you're looking to use which() on is located.
+
+```{r}
+up.ind <- which(mycounts$log2fc > 2)
+length(up.ind)
+down.ind <- which(mycounts$log2fc < (-2))
+length(down.ind)
+```
+
+## Question 8 
+250 genes are upregulated with log2fc > 2. 
+
+## Question 9 
+367 genes are downregulated with lo2fc < -2. 
+
+## Question 10
+I don't trust these reuslts because we have not done any quality control or statistical analysis. 
+
+# Now use DESeq2!!! 
+```{r, include=FALSE}
+library(BiocManager)
+library(DESeq2)
+```
+
+```{r}
+dds <- DESeqDataSetFromMatrix(countData=count, 
+                              colData=md, 
+                              design=~dex)
+dds
+```
+
+```{r}
+dds <- DESeq(dds)
+```
+
+```{r}
+res <- results(dds)
+res
+```
+
+```{r}
+summary(res)
+```
+
+Want to use a different (lower) p-value to make the threshold for significance more stringent (p < 0.05) 
+```{r}
+res05 <- results(dds, alpha=0.05)
+summary(res05)
+```
+
+Now I want to annotate this data so that we can actually see what genes are altered (b/c right now we only have accession numbers, which aren't readable by us). Import all human annotated genes. 
+```{r, include=FALSE}
+library("AnnotationDbi")
+library("org.Hs.eg.db")
+```
+
+```{r}
+columns(org.Hs.eg.db)
+```
+
+New column 'symbol' will be added on, and this is the converted Ensembl --> gene symbol per gene. 
+```{r}
+res$symbol <- mapIds(org.Hs.eg.db,
+                     keys=row.names(res), # Our genenames
+                     keytype="ENSEMBL",        # The format of our genenames
+                     column="SYMBOL",          # The new format we want to add
+                     multiVals="first")
+
+head(res)
+```
+
+## Question 11 
+Also generate columns for Entrez ID, Uniprot Accession, and GENENAME. 
+```{r}
+res$entrez <- mapIds(org.Hs.eg.db,
+                     keys=row.names(res), # Our genenames
+                     keytype="ENSEMBL",        # The format of our genenames
+                     column="ENTREZID",          # The new format we want to add
+                     multiVals="first")
+
+res$uniprot <- mapIds(org.Hs.eg.db,
+                     keys=row.names(res), # Our genenames
+                     keytype="ENSEMBL",        # The format of our genenames
+                     column="UNIPROT",          # The new format we want to add
+                     multiVals="first")
+
+res$genename <- mapIds(org.Hs.eg.db,
+                     keys=row.names(res), # Our genenames
+                     keytype="ENSEMBL",        # The format of our genenames
+                     column="GENENAME",          # The new format we want to add
+                     multiVals="first")
+
+head(res)
+```
+
+# Make a volcano plot! 
+This will be a summary figure of our DESeq2 results. 
+```{r}
+plot(res$log2FoldChange, res$padj)
+```
+
+This does not look like the standard volcano plot and also looks bad because p-values are very small. We need to do a log-transform to spread out the data.
+```{r}
+#Upside down volcano plot, need to -log to invert this volcano.
+#plot(res$log2FoldChange,  log(res$padj))
+
+plot(res$log2FoldChange,  -log(res$padj))
+
+# Add some cut-off lines
+abline(v=c(-2,2), col="darkgray", lty=2)
+abline(h=-log(0.05), col="darkgray", lty=2)
+
+# Setup our custom point color vector 
+mycols <- rep("gray", nrow(res))
+mycols[ abs(res$log2FoldChange) > 2 ]  <- "red" 
+
+inds <- (res$padj < 0.01) & (abs(res$log2FoldChange) > 2 )
+mycols[ inds ] <- "blue"
+
+# Volcano plot with custom colors 
+plot( res$log2FoldChange,  -log(res$padj), 
+ col=mycols, ylab="-Log(P-value)", xlab="Log2(FoldChange)" )
+
+# Cut-off lines
+abline(v=c(-2,2), col="gray", lty=2)
+abline(h=-log(0.1), col="gray", lty=2)
+```
+
+Do this in ggplot for fun! 
+
+Adding color: based on log2 fold change value (>0 = red, <0 = blue)
+Add a column to the entire dataframe??? Can't figure it out how to get the colors to work right ...
+```{r}
+res$mycols <- rep('gray', nrow(res))
+res$mycols[abs(res$log2FoldChange) > 2] <- "red" 
+res$mycols[(res$padj < 0.01) & (abs(res$log2FoldChange) > 2)] <- "blue"
+
+ggplot(as.data.frame(res)) + aes(res$log2FoldChange, -log(res$padj), col=res$mycols) + geom_point() + 
+  geom_vline(xintercept=2, col="darkgray", lty=2) + geom_vline(xintercept=-2, col="darkgray", lty=2) +
+  geom_hline(yintercept=-log(0.05), col="darkgray", lty=2) 
+```
+
+```{r, include=FALSE}
+library(pathview)
+library(gage)
+library(gageData)
+```
+
+```{r}
+data(kegg.sets.hs)
+
+# Examine the first 2 pathways in this kegg set for humans
+head(kegg.sets.hs, 2)
+```
+
+Pick out gene names and fold change from our dataset. 
+```{r}
+foldchanges = res$log2FoldChange
+
+#names() will provide a label for each foldchange value (the name is entrez ID in this case) 
+names(foldchanges) = res$entrez
+head(foldchanges)
+```
+
+
+```{r}
+# Get the results
+keggres = gage(foldchanges, gsets=kegg.sets.hs)
+
+attributes(keggres)
+
+# Look at the first three down (less) pathways
+head(keggres$less, 3)
+```
+
+Downregulated pathways are Graft-versus-host disease, Type I diabetes, and asthma.
+
+Want to do a "pathview" of the asthma pathway specifically. We can manually input pathway number (output from the gene set enrichment analysis) and then get a visualization of the whole pathway! It also automatically downloads into your directory. This is in PNG format.
+```{r}
+pathview(gene.data=foldchanges, pathway.id="hsa05310")
+```
+
+![](hsa05310.png)
+
+```{r}
+# A different PDF based output of the same data
+pathview(gene.data=foldchanges, pathway.id="hsa05310", kegg.native=FALSE)
+```
+
+## Question 12 
+Do the same for the top 2 downregulated pathways (Graft-versus-host disease, Type I diabetes)
+
+### Graft-versus-host disease: hsa05332 
+```{r}
+pathview(gene.data=foldchanges, pathway.id="hsa05332")
+
+pathview(gene.data=foldchanges, pathway.id="hsa05332", kegg.native=FALSE)
+```
+
+![](hsa05332.png)
+
+### Type I diabetes
+```{r}
+pathview(gene.data=foldchanges, pathway.id="hsa04940")
+
+pathview(gene.data=foldchanges, pathway.id="hsa04940", kegg.native=FALSE)
+```
+
+![](hsa04940.png)
+
+```{r}
+write.csv(res, file='deseqresults.csv')
+```
