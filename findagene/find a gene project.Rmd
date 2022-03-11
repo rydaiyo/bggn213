@@ -1,0 +1,25 @@
+---
+title: "find a gene project"
+author: "Rachel Diao"
+date: "3/11/2022"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+library(bio3d)
+```
+
+```{r}
+align_fst <- read.fasta('muscle_align_fasta')
+consensus_seq <- consensus(align_fst)
+
+identity_matrix <- seqidentity(align_fst)
+png(filename = 'alignment_heatmap.png', width=800, height=600)
+heatmap(identity_matrix, margins = c(17,10))
+```
+
+```{r}
+mincog <- read.fasta('m_ingcognita')
+
+blast.pdb(mincog)
+```
