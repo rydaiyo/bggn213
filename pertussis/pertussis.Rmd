@@ -190,6 +190,8 @@ ggplot(ig1) +
   geom_boxplot() + 
   facet_wrap(vars(visit), nrow=2)
 ```
+## Question 14 
+PRN, FIM/2/3, and FHA are increased over time. This makes sense because these are all Pertussis antigens. I also see a slight increase in antibodies produced in response to DT, the diphtheria and tetanus combined antigen, which also makes sense because the aP vaccine is administered in combination with the diphtheria and tetanus vaccines.
 
 Now we add in the infancy_vac information (whether they received the wP or aP vaccine) as the color to look at differences in antibody titer between the two. 
 ```{r}
@@ -218,7 +220,8 @@ ggplot(ig1_1n4) +
   geom_boxplot(show.legend = FALSE) + 
   facet_wrap(vars(infancy_vac, visit), nrow=2)
 ```
-Plot measles antibody count.
+## Question 15
+Plot measles antibody count vs. FIM2/3
 ```{r}
 filter(ig1, antigen=="Measles") %>%
   ggplot() +
@@ -237,6 +240,12 @@ filter(ig1, antigen=='FIM2/3') %>%
   facet_wrap(vars(visit)) +
   theme_bw()
 ```
+## Question 16
+I noticed that measles antigen levels stay extremely low over the time course, while the FIM2/3 antigen levels experience an increase at vist 4 and remain high over the rest of the time course.
+
+## Question 17 
+I do not see any clear differences in aP vs. wP responses. 
+
 # Working with expression data 
 
 We now want to look at the expression of IGHG1, which expresses IgG antibodies.
